@@ -14,11 +14,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import plot_roc_curve
 from sklearn.metrics import auc
 from sklearn.metrics import plot_confusion_matrix
+from sklearn.metrics import roc_auc_score
 
 ###############################################################################
 
 # Load the Excel File and seprate the dependent and independent variables.
-data = pd.read_excel(r'test.xlsx')
+data = pd.read_excel(r'D:\Justus Project\ROC Hantavsnon.xlsx')
     
 data_temp = data[['Fever', 'Headache/visual disturbance', 'Female Sex', 'Thrombo <150']]        
 imp = SimpleImputer(strategy="most_frequent")
@@ -126,20 +127,46 @@ for i in range(5):
     aucs.append(viz.roc_auc)
     randomState += 10
 
+# Confidence Interval For For one fold
+
+randomState = 73
+classifier = LogisticRegression()
+X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = randomState)
+
+auc_values = []
+nsamples = 1000
+for b in range(nsamples):
+    idx = np.random.randint(X_train.shape[0], size=X_train.shape[0])
+    classifier.fit(X_train[idx], y_train[idx])
+    
+    pred = classifier.predict_proba(X_test)[:, 1]
+    roc_auc = roc_auc_score(y_test.ravel(), pred.ravel())
+    auc_values.append(roc_auc)
+    
+auc_values = np.array(auc_values)
+auc_values.sort()
+
+confidence_lower = auc_values[int(0.05 * len(auc_values))]
+confidence_upper = auc_values[int(0.95 * len(auc_values))]
+
+viz = plot_roc_curve(classifier, X_test, y_test, name='ROC fold {}'.format(i),alpha=0.3, lw=1, ax=ax)
+
 fig, ax = plt.subplots()   
 ax.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', alpha=.8)
 
 mean_tpr = np.mean(tprs, axis=0)
 mean_tpr[-1] = 1.0
 mean_auc = auc(mean_fpr, mean_tpr)
-std_auc = np.std(aucs)
+ 
+ax.plot(viz.fpr, viz.tpr, color = 'b', label = r'AUC = ' + str(round(viz.roc_auc,2)) + '(' + str(round(confidence_lower, 2)) + ' - ' + str(round(confidence_upper, 2)) + ')', lw = 2, alpha = .8)
 
+# Confidence Interval For Cross Validation
+aucs = np.array(aucs)
+aucs.sort()
+confidence_lower_CrossVal = aucs[int(0.05 * len(aucs))]
+confidence_upper_CrossVal = aucs[int(0.95 * len(aucs))]
+ax.plot(mean_fpr, mean_tpr, color = 'r', label = 'Mean AUC = ' + str(round(mean_auc,2)) + '(' + str(round(confidence_lower_CrossVal, 2)) + ' - ' + str(round(confidence_upper_CrossVal, 2)) + ')', lw = 2, alpha = .8)
 
-ax.plot(viz.fpr, viz.tpr, color = 'b', label = r'AUC = %0.2f $\pm$ %0.2f' % (auc(viz.fpr, viz.tpr), np.std(viz.roc_auc)), lw = 2, alpha = .8)
-
-std_tpr = np.std(tprs, axis=0)
-tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
-tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
 
 ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05])
 ax.legend(loc="lower right", fontsize='large')
@@ -147,10 +174,11 @@ ax.set_xlabel('1 - Specificity', fontsize='large', fontweight='bold')
 ax.set_ylabel('Sensitivity', fontsize='large', fontweight='bold')
 plt.show()
 
+
 ###############################################################################
 
 fig, ax = plt.subplots()
-X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = 23)
+X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = 73)
 classifier = LogisticRegression()
 classifier.fit(X_train, y_train)
 
