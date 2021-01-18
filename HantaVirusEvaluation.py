@@ -16,6 +16,10 @@ from sklearn.metrics import auc
 from sklearn.metrics import plot_confusion_matrix
 from sklearn.metrics import roc_auc_score
 
+
+from sklearn.metrics import confusion_matrix
+import itertools
+
 ###############################################################################
 
 # Load the Excel File and seprate the dependent and independent variables.
@@ -87,13 +91,133 @@ probability_2 = np.round((probability_2 / sore_2) * 100)
 probability_3 = np.round((probability_3 / sore_3) * 100)
 probability_4 = np.round((probability_4 / sore_4) * 100)
 
-
 print('Probability of HantaVirus with 0 or 1 Risk score:  '  + str(probability_1))
 print('Probability of HantaVirus with 2 Risk score:  '  + str(probability_2))
 print('Probability of HantaVirus with 3 Risk score:  '  + str(probability_3))
 print('Probability of HantaVirus with 4 or more Risk score:  '  + str(probability_4))
 
+###############################################################################
 
+
+def plot_confusion_matrix_m(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    print(cm)
+
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, cm[i, j],
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
+
+###############################################################################
+
+# PLOT CONFUSION MATRIX PER PROBABILITY
+
+y = data[['Hantavirus']]
+y = imp.fit_transform(y)
+
+y_pred_0 = [0] * len(y)
+y_pred_1 = [0] * len(y)
+y_pred_2 = [0] * len(y)
+y_pred_3 = [0] * len(y)
+y_pred_4 = [0] * len(y)
+
+for i in range(len(data)):
+    
+    if data.iloc[i]['scores'] >= 0 :
+        y_pred_0[i] = 1
+        
+    if data.iloc[i]['scores'] >= 1 :
+        y_pred_1[i] = 1
+        
+    if data.iloc[i]['scores'] >= 2 :
+        y_pred_2[i] = 1
+        
+    if data.iloc[i]['scores'] >= 3:
+        y_pred_3[i] = 1
+        
+    if data.iloc[i]['scores'] >= 4 :
+        y_pred_4[i] = 1   
+
+class_names = ['Healthy', 'Infected']
+cm = confusion_matrix(y, y_pred_0)
+
+# Plot non-normalized confusion matrix
+plt.figure()
+plot_confusion_matrix_m(cm, classes=class_names,
+                      title = 'Score >= 0')
+plt.show()
+
+total = sum(sum(cm))
+accuracy = (cm[0,0]+cm[1,1])/total
+sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
+specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
+cm = confusion_matrix(y, y_pred_1)
+plt.figure()
+plot_confusion_matrix_m(cm, classes=class_names,
+                      title = 'Score >= 1')
+plt.show()
+total = sum(sum(cm))
+accuracy = (cm[0,0]+cm[1,1])/total
+sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
+specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
+cm = confusion_matrix(y, y_pred_2)
+plt.figure()
+plot_confusion_matrix_m(cm, classes=class_names,
+                      title = 'Score >= 2')
+plt.show()
+total = sum(sum(cm))
+accuracy = (cm[0,0]+cm[1,1])/total
+sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
+specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
+cm = confusion_matrix(y, y_pred_3)
+plt.figure()
+plot_confusion_matrix_m(cm, classes=class_names,
+                      title = 'Score >= 3')
+plt.show()
+total = sum(sum(cm))
+accuracy = (cm[0,0]+cm[1,1])/total
+sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
+specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
+cm = confusion_matrix(y, y_pred_4)
+plt.figure()
+plot_confusion_matrix_m(cm, classes=class_names,
+                      title = 'Score >= 4')
+plt.show()
+total = sum(sum(cm))
+accuracy = (cm[0,0]+cm[1,1])/total
+sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
+specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
+ 
 ###############################################################################
 
 data_temp = data[['Fever','Headache/visual disturbance', 'Female Sex', 'Thrombo <150']]  
