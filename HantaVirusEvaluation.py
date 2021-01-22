@@ -23,14 +23,14 @@ import itertools
 ###############################################################################
 
 # Load the Excel File and seprate the dependent and independent variables.
-data = pd.read_excel(r'D:\Justus Project\ROC Hantavsnon.xlsx')
+data = pd.read_excel(r'Path')
     
-data_temp = data[['Fever', 'Headache/visual disturbance', 'Female Sex', 'Thrombo <150']]        
-imp = SimpleImputer(strategy="most_frequent")
-x = imp.fit_transform(data_temp)
+data_temp = data[['Fever', 'Headache', 'LDH >300', 'Thrombo <150', 'Hantavirus']] 
+data_temp.dropna(inplace = True) 
+ 
+x = data_temp[['Fever', 'Headache', 'LDH >300', 'Thrombo <150']]
 
-y = data[['Hantavirus']]
-y = imp.fit_transform(y)
+y = data_temp[['Hantavirus']]
 
 ###############################################################################
 
@@ -41,7 +41,7 @@ result = logit_model.fit()
 print(result.summary2())
 
 classifier = LogisticRegression()
-classifier.fit(X_train, y_train)
+classifier.fit(x, y)
 classifier.coef_
 
 ###############################################################################
@@ -54,7 +54,7 @@ for i in range(len(data)):
     score = 0
     if data.iloc[i]['Fever'] == 1:
         score += points[0]
-    if data.iloc[i]['Headache/visual disturbance'] == 1:
+    if data.iloc[i]['Headache'] == 1:
         score += points[1]
     if data.iloc[i]['LDH >300'] == 1:
         score += points[2]
@@ -65,15 +65,20 @@ for i in range(len(data)):
 ###############################################################################
 
 data['scores'] = scoreList
+
 probability_1 = 0
 probability_2 = 0
 probability_3 = 0
 probability_4 = 0
+probability_5 = 0
+probability_6 = 0
 
 sore_0_1 = scoreList.count(1) + scoreList.count(0)
 sore_2 = scoreList.count(2)
 sore_3 = scoreList.count(3)
 sore_4 = scoreList.count(4)
+sore_5 = scoreList.count(5)
+sore_6 = scoreList.count(6)
 
 for i in range(len(data)):
     if (data.iloc[i]['scores'] == 1 or data.iloc[i]['scores'] == 0) and data.iloc[i]['Hantavirus'] == 1:
@@ -84,17 +89,26 @@ for i in range(len(data)):
        probability_3 += 1
     if data.iloc[i]['scores'] == 4 and data.iloc[i]['Hantavirus'] == 1:
        probability_4 += 1
-
-
+    if data.iloc[i]['scores'] == 5 and data.iloc[i]['Hantavirus'] == 1:
+       probability_5 += 1
+    if data.iloc[i]['scores'] == 6 and data.iloc[i]['Hantavirus'] == 1:
+       probability_6 += 1
+       
+       
 probability_1 = np.round((probability_1 / sore_0_1) * 100)
 probability_2 = np.round((probability_2 / sore_2) * 100)
 probability_3 = np.round((probability_3 / sore_3) * 100)
 probability_4 = np.round((probability_4 / sore_4) * 100)
+probability_5 = np.round((probability_5 / sore_5) * 100)
+probability_6 = np.round((probability_6 / sore_6) * 100)
+
 
 print('Probability of HantaVirus with 0 or 1 Risk score:  '  + str(probability_1))
 print('Probability of HantaVirus with 2 Risk score:  '  + str(probability_2))
 print('Probability of HantaVirus with 3 Risk score:  '  + str(probability_3))
-print('Probability of HantaVirus with 4 or more Risk score:  '  + str(probability_4))
+print('Probability of HantaVirus with 4 Risk score:  '  + str(probability_4))
+print('Probability of HantaVirus with 5 Risk score:  '  + str(probability_5))
+print('Probability of HantaVirus with 6 Risk score:  '  + str(probability_6))
 
 ###############################################################################
 
@@ -137,14 +151,13 @@ def plot_confusion_matrix_m(cm, classes,
 
 # PLOT CONFUSION MATRIX PER PROBABILITY
 
-y = data[['Hantavirus']]
-y = imp.fit_transform(y)
-
 y_pred_0 = [0] * len(y)
 y_pred_1 = [0] * len(y)
 y_pred_2 = [0] * len(y)
 y_pred_3 = [0] * len(y)
 y_pred_4 = [0] * len(y)
+y_pred_5 = [0] * len(y)
+y_pred_6 = [0] * len(y)
 
 for i in range(len(data)):
     
@@ -161,9 +174,19 @@ for i in range(len(data)):
         y_pred_3[i] = 1
         
     if data.iloc[i]['scores'] >= 4 :
-        y_pred_4[i] = 1   
-
+        y_pred_4[i] = 1 
+        
+    if data.iloc[i]['scores'] >= 5 :
+        y_pred_5[i] = 1
+        
+    if data.iloc[i]['scores'] >= 6 :
+        y_pred_6[i] = 1    
+        
+        
 class_names = ['Healthy', 'Infected']
+
+##########################################
+
 cm = confusion_matrix(y, y_pred_0)
 
 # Plot non-normalized confusion matrix
@@ -177,6 +200,8 @@ accuracy = (cm[0,0]+cm[1,1])/total
 sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
 specificity = cm[1,1]/(cm[1,0]+cm[1,1])
 
+##########################################
+
 cm = confusion_matrix(y, y_pred_1)
 plt.figure()
 plot_confusion_matrix_m(cm, classes=class_names,
@@ -186,6 +211,8 @@ total = sum(sum(cm))
 accuracy = (cm[0,0]+cm[1,1])/total
 sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
 specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
+##########################################
 
 cm = confusion_matrix(y, y_pred_2)
 plt.figure()
@@ -197,6 +224,8 @@ accuracy = (cm[0,0]+cm[1,1])/total
 sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
 specificity = cm[1,1]/(cm[1,0]+cm[1,1])
 
+##########################################
+
 cm = confusion_matrix(y, y_pred_3)
 plt.figure()
 plot_confusion_matrix_m(cm, classes=class_names,
@@ -206,6 +235,8 @@ total = sum(sum(cm))
 accuracy = (cm[0,0]+cm[1,1])/total
 sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
 specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
+##########################################
 
 cm = confusion_matrix(y, y_pred_4)
 plt.figure()
@@ -217,17 +248,31 @@ accuracy = (cm[0,0]+cm[1,1])/total
 sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
 specificity = cm[1,1]/(cm[1,0]+cm[1,1])
 
+##########################################
+
+cm = confusion_matrix(y, y_pred_5)
+plt.figure()
+plot_confusion_matrix_m(cm, classes=class_names,
+                      title = 'Score >= 5')
+plt.show()
+total = sum(sum(cm))
+accuracy = (cm[0,0]+cm[1,1])/total
+sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
+specificity = cm[1,1]/(cm[1,0]+cm[1,1])
  
+##########################################
+
+cm = confusion_matrix(y, y_pred_6)
+plt.figure()
+plot_confusion_matrix_m(cm, classes=class_names,
+                      title = 'Score >= 6')
+plt.show()
+total = sum(sum(cm))
+accuracy = (cm[0,0]+cm[1,1])/total
+sensitivity = cm[0,0]/(cm[0,0]+cm[0,1])
+specificity = cm[1,1]/(cm[1,0]+cm[1,1])
+
 ###############################################################################
-
-data_temp = data[['Fever','Headache/visual disturbance', 'Female Sex', 'Thrombo <150']]  
-imp = SimpleImputer(strategy="most_frequent")
-x = imp.fit_transform(data_temp)
-
-
-y = data[['Hantavirus']]
-y = imp.fit_transform(y)
-
 aucs = []
 tprs = []
 
@@ -253,15 +298,16 @@ for i in range(5):
 
 # Confidence Interval For For one fold
 
-randomState = 73
+randomState = 23
 classifier = LogisticRegression()
 X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = randomState)
+y_test = y_test.to_numpy()
 
 auc_values = []
 nsamples = 1000
 for b in range(nsamples):
-    idx = np.random.randint(X_train.shape[0], size=X_train.shape[0])
-    classifier.fit(X_train[idx], y_train[idx])
+    idx = np.random.randint(X_train.shape[0], size = X_train.shape[0])
+    classifier.fit(X_train.iloc[idx], y_train.iloc[idx])
     
     pred = classifier.predict_proba(X_test)[:, 1]
     roc_auc = roc_auc_score(y_test.ravel(), pred.ravel())
