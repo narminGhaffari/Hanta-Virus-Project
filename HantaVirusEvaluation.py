@@ -11,29 +11,30 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import plot_roc_curve
-from sklearn.metrics import plot_confusion_matrix
+from sklearn.metrics import RocCurveDisplay
+from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import confusion_matrix
 import itertools
 import matplotlib
 from sklearn import metrics
+import os
 
 #%%
-
-data = pd.read_excel(open(r"###", 'rb'), sheet_name='Hanta vs. AKI_Thrombopenie') 
-
-data_temp = data[['Fever', 'Visual disturbance/headache', 'LDH >300', 'Thrombo <150', 'AKI']] 
+input_path = '/Users/narmin/Documents/Hanta_Virus_Data/Narmin_DATA_UPLOADFILE_200224_JB_GB2.xlsx'
+output_path = '/Users/narmin/Documents/Hanta_Virus_Data/Results_08042024/Hanta vs. All Controls'
+sheet_name = 'Hanta vs. All Controls 2'
+data = pd.read_excel(open(input_path, 'rb'), sheet_name = sheet_name) 
+x_labels = ['Fever (yes/no)', 'Headache (yes/no)', 'LDH >300 U/dL (yes/no)', 'AKI as Crea >=0,3 mg/dL ULN on DOA (yes/no)']
+y_label = ['Hanta-positive (yes/no)']
+filtered_data = data[x_labels] 
      
 imp = SimpleImputer(strategy="most_frequent")
-x = np.array(imp.fit_transform(data_temp))
+x = np.array(imp.fit_transform(filtered_data))
 
-y = data[['Hanta-pos']]
-
+y = np.array(data[y_label])
 hantaVirusCount = np.sum(y)
-y = imp.fit_transform(y)
 
 #%%
-
 classifier = LogisticRegression()
 classifier.fit(x, y)
 print(classifier.coef_)
@@ -42,65 +43,30 @@ points = np.abs(np.round(classifier.coef_))
 points = points[0]
 print(points)
 #%%
-
 scoreList = []
 
 for i in range(len(data)):
     score = 0
-    if data.iloc[i]['Fever'] == 1:
+    if data.iloc[i][x_labels[0]] == 1:
         score += points[0]
-    if data.iloc[i]['Visual disturbance/headache'] == 1:
+    if data.iloc[i][x_labels[1]] == 1:
         score += points[1]
-    if data.iloc[i]['LDH >300'] == 1:
+    if data.iloc[i][x_labels[2]] == 1:
         score += points[2]
-    if data.iloc[i]['Thrombo <150'] == 1:
+    if data.iloc[i][x_labels[3]] == 1:
         score += points[3]
-    if data.iloc[i]['AKI'] == 1:
-        score += points[4]
     scoreList.append(score)
 
 data['scores'] = scoreList
 
 #%%
 # Calculate prediction o the model based on the scores. 
-
-y_pred_0 = [0] * len(y)
-y_pred_1 = [0] * len(y)
-y_pred_2 = [0] * len(y)
-y_pred_3 = [0] * len(y)
-y_pred_4 = [0] * len(y)
-y_pred_5 = [0] * len(y)
-y_pred_6 = [0] * len(y)
-y_pred_7 = [0] * len(y)
-
-for i in range(len(data)):
-    
-    if data.iloc[i]['scores'] >= 0 :
-        y_pred_0[i] = 1
-        
-    if data.iloc[i]['scores'] >= 1 :
-        y_pred_1[i] = 1
-        
-    if data.iloc[i]['scores'] >= 2 :
-        y_pred_2[i] = 1
-        
-    if data.iloc[i]['scores'] >= 3:
-        y_pred_3[i] = 1
-        
-    if data.iloc[i]['scores'] >= 4 :
-        y_pred_4[i] = 1 
-        
-    if data.iloc[i]['scores'] >= 5 :
-        y_pred_5[i] = 1
-        
-    if data.iloc[i]['scores'] >= 6 :
-        y_pred_6[i] = 1   
-
-    if data.iloc[i]['scores'] >= 7 :
-        y_pred_7[i] = 1  
-         
+y_preds = [[0] * len(y) for _ in range(8)]
+for i, score in enumerate(data['scores']):
+    for j in range(8):
+        if score >= j:
+            y_preds[j][i] = 1
 #%%
-
 def CalculateConfidenceInterval(scoreList):
     nsamples = 1000
     probabilityList = []
@@ -113,34 +79,24 @@ def CalculateConfidenceInterval(scoreList):
         if len(scoreList)>1:
             score = scoreList_temp.count(scoreList[0]) + scoreList_temp.count(scoreList[1])
             for i in range(len(data_temp)):
-                if (data_temp.iloc[i]['scores'] == scoreList[0] or data_temp.iloc[i]['scores'] == scoreList[1]) and data_temp.iloc[i]['Hanta-pos'] == 1:
+                if (data_temp.iloc[i]['scores'] == scoreList[0] or data_temp.iloc[i]['scores'] == scoreList[1]) and data_temp.iloc[i][y_label[0]] == 1:
                     probability += 1
         else:
             score = scoreList_temp.count(scoreList[0])
             for i in range(len(data_temp)):
-                if data_temp.iloc[i]['scores'] == scoreList[0] and data_temp.iloc[i]['Hanta-pos'] == 1:
+                if data_temp.iloc[i]['scores'] == scoreList[0] and data_temp.iloc[i][y_label[0]] == 1:
                     probability += 1
         probabilityList.append(np.round((probability / score) * 100))
     probabilityList.sort()
-    confidence_lower_mean = probabilityList[int(0.025 * len(probabilityList))]
-    confidence_upper_mean = probabilityList[int(0.975 * len(probabilityList))]
-    print('Lower CI: {}'.format(confidence_lower_mean))
-    print('Higher CI: {}'.format(confidence_upper_mean))
+    confidence_lower = probabilityList[int(0.025 * len(probabilityList))]
+    confidence_upper = probabilityList[int(0.975 * len(probabilityList))]
+    return confidence_lower, confidence_upper
 
 #%%
-
 class_names = ['Healthy', 'Infected']
-def plot_confusion_matrix_m(cm, classes,
-                          normalize=False,
-                          title='Confusion matrix',
-                          cmap=plt.cm.Blues):
+def plot_confusion_matrix_m(cm, classes,normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
     
     matplotlib.rcParams.update({'font.size': 25})
-
-    """
-    This function prints and plots the confusion matrix.
-    Normalization can be applied by setting `normalize=True`.
-    """
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title, size = 25)
     #plt.colorbar()
@@ -150,18 +106,10 @@ def plot_confusion_matrix_m(cm, classes,
 
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        print("Normalized confusion matrix")
-    else:
-        print('Confusion matrix, without normalization')
-
-    print(cm)
 
     thresh = cm.max() / 2.
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(j, i, cm[i, j],
-                 horizontalalignment="center",
-                 color="white" if cm[i, j] > thresh else "black")
-
+        plt.text(j, i, cm[i, j], horizontalalignment="center", color="white" if cm[i, j] > thresh else "black")
     plt.tight_layout()
     plt.ylabel('True label\n')
     plt.xlabel('\nPredicted label')
@@ -170,153 +118,87 @@ def plot_confusion_matrix_m(cm, classes,
 def CalculateParameters(cm):
     total = sum(sum(cm))
     accuracy = (cm[0,0]+cm[1,1])/total
+    accuracy = np.round(accuracy, 4)*100
     sensitivity = cm[1,1]/(cm[1,1]+cm[1,0])
+    sensitivity = np.round(sensitivity, 4)*100
     specificity = cm[0,0]/(cm[0,0]+cm[0,1])
-    print('accuracy: {}'.format(np.round(accuracy, 4)*100))
-    print('Sensitivity: {}'.format(np.round(sensitivity, 4)*100))
-    print('specificity: {}'.format(np.round(specificity, 4)*100))
-    print('#######################')
+    specificity = np.round(specificity, 4)*100
+    return accuracy, sensitivity, specificity
     
-#%% Generate the probabilities and the confidence intervals
+#%%  Initialize dictionaries to store probabilities and score counts
+probabilities = {f'probability_{i}': 0 for i in range(0, 8)}
+score_counts = {f'score_{i}': scoreList.count(i) for i in range(8)}
+results = {f'score_{i}': scoreList.count(i) for i in range(8)}
 
-probability_1 = 0
-probability_2 = 0
-probability_3 = 0
-probability_4 = 0
-probability_5 = 0
-probability_6 = 0
-probability_7 = 0
+# Update probabilities based on the conditions
+for i in range(8):
+    for _, (score, hanta_positive) in enumerate(zip(data['scores'], data[y_label[0]])):
+        if int(score) == i and hanta_positive == 1:
+            key = f'probability_{i}'
+            probabilities[key] += 1    
+                
+for i in range(8):
+    score_key = f'score_{i}'
+    prob_key = f'probability_{i}'
+    if score_counts[score_key] != 0:  # Avoiding division by zero and using i > 0 to skip score_0
+        probability = np.round((probabilities[prob_key] / score_counts[score_key]) * 100)
+        confidence_lower, confidence_upper = CalculateConfidenceInterval([i])
+        plt.figure()
+        cm = confusion_matrix(y, y_preds[i])
+        plot_confusion_matrix_m(cm, classes=class_names, title=f'Score >= {i}')
+        plt.savefig(os.path.join(output_path, f'confusion_matrix_score_{i}.svg'), format='svg')
+        accuracy, sensitivity, specificity = CalculateParameters(cm)
+        results[score_key] = [probability, confidence_lower, confidence_upper, accuracy, sensitivity, specificity]
 
-sore_0_1 = scoreList.count(1) + scoreList.count(0)
-sore_2 = scoreList.count(2)
-sore_3 = scoreList.count(3)
-sore_4 = scoreList.count(4)
-sore_5 = scoreList.count(5)
-sore_6 = scoreList.count(6)
-sore_7 = scoreList.count(7)
+# Convert dictionary to DataFrame and transpose it
+results_df = pd.DataFrame(results).T
 
-for i in range(len(data)):
-    if (data.iloc[i]['scores'] == 1 or data.iloc[i]['scores'] == 0) and data.iloc[i]['Hanta-pos'] == 1:
-       probability_1 += 1
-    elif data.iloc[i]['scores'] == 2 and data.iloc[i]['Hanta-pos'] == 1:
-       probability_2 += 1       
-    elif data.iloc[i]['scores'] == 3 and data.iloc[i]['Hanta-pos'] == 1:
-       probability_3 += 1
-    elif data.iloc[i]['scores'] == 4 and data.iloc[i]['Hanta-pos'] == 1:
-       probability_4 += 1
-    elif data.iloc[i]['scores'] == 5 and data.iloc[i]['Hanta-pos'] == 1:
-       probability_5 += 1
-    elif data.iloc[i]['scores'] == 6 and data.iloc[i]['Hanta-pos'] == 1:
-       probability_6 += 1
-    elif data.iloc[i]['scores'] == 7 and data.iloc[i]['Hanta-pos'] == 1:
-       probability_7 += 1
+# Assigning new column names
+results_df.columns = ["probability(%)", "confidence_lower(%)", "onfidence_upper(%)", "accuracy(%)", "sensitivity(%)", "specificity(%)"]
 
-if not sore_0_1 == 0:
-    probability_1 = np.round((probability_1 / sore_0_1) * 100)
-    print('Probability of HantaVirus with 0 or 1 Risk score:  '  + str(probability_1))
-    CalculateConfidenceInterval([0,1])
-    
-    cm = confusion_matrix(y, y_pred_0)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 0')
-    plt.show()
-    CalculateParameters(cm)
-
-    cm = confusion_matrix(y, y_pred_1)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 1')
-    plt.show()
-    CalculateParameters(cm)    
-if not sore_2 == 0:
-    probability_2 = np.round((probability_2 / sore_2) * 100)
-    print('Probability of HantaVirus with 2 Risk score:  '  + str(probability_2))
-    CalculateConfidenceInterval([2])
-    cm = confusion_matrix(y, y_pred_2)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 2')
-    plt.show()
-    CalculateParameters(cm)
-if not sore_3 == 0:
-    probability_3 = np.round((probability_3 / sore_3) * 100)
-    print('Probability of HantaVirus with 3 Risk score:  '  + str(probability_3))  
-    CalculateConfidenceInterval([3])
-    cm = confusion_matrix(y, y_pred_3)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 3')
-    plt.show()
-    CalculateParameters(cm)
-if not sore_4 == 0:
-    probability_4 = np.round((probability_4 / sore_4) * 100)
-    print('Probability of HantaVirus with 4 Risk score:  '  + str(probability_4))    
-    CalculateConfidenceInterval([4])    
-    cm = confusion_matrix(y, y_pred_4)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 4')
-    plt.show()
-    CalculateParameters(cm)
-if not sore_5 == 0:
-    probability_5 = np.round((probability_5 / sore_5) * 100)
-    print('Probability of HantaVirus with 5 Risk score:  '  + str(probability_5))
-    CalculateConfidenceInterval([5])
-    cm = confusion_matrix(y, y_pred_5)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 5')
-    plt.show()
-    CalculateParameters(cm)
-if not sore_6 == 0:
-    probability_6 = np.round((probability_6 / sore_6) * 100)
-    print('Probability of HantaVirus with 6 Risk score:  '  + str(probability_6))
-    CalculateConfidenceInterval([6])
-    cm = confusion_matrix(y, y_pred_6)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 6')
-    plt.show()
-    CalculateParameters(cm)
-if not sore_7 == 0:
-    probability_7 = np.round((probability_7 / sore_7) * 100)
-    print('Probability of HantaVirus with 7 Risk score:  '  + str(probability_7))
-    CalculateConfidenceInterval([7])
-    cm = confusion_matrix(y, y_pred_7)
-    plt.figure()
-    plot_confusion_matrix_m(cm, classes=class_names, title = 'Score >= 7')
-    plt.show()
-    CalculateParameters(cm)
+# Save the DataFrame to an Excel file
+results_df.to_excel(os.path.join(output_path, 'results.xlsx'), index_label='Results')
 
 #%%
-
-results = {}
-results['tpr'] = {}
-results['fpr'] = {}
-results['auc'] = {}
+# 5 fold cross validation
+results_auc = {}
+results_auc['tpr'] = {}
+results_auc['fpr'] = {}
+results_auc['auc'] = {}
 
 randomState = 23
 matplotlib.rcParams.update({'font.size': 20})
-
 fpr_temp = np.linspace(0, 1, 100)
-
 for i in range(5):
     classifier = LogisticRegression()
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = randomState)
-    
     classifier.fit(X_train, y_train)
-    y_pred_proba = classifier.predict_proba(X_test)[::,1]
-    fpr, tpr, _ = metrics.roc_curve(y_test,  y_pred_proba)
-    auc = metrics.roc_auc_score(y_test, y_pred_proba)
-    results['tpr'][i] = np.interp(fpr_temp, fpr, tpr)
-    results['tpr'][i][0] = 0.0
-    results['fpr'][i] = fpr_temp
-    results['auc'][i] = auc
+    y_pred = classifier.predict_proba(X_test)[::,1]
+    fpr, tpr, _ = metrics.roc_curve(y_test,  y_pred)
+    auc = metrics.roc_auc_score(y_test, y_pred)
+    results_auc['tpr'][i] = np.interp(fpr_temp, fpr, tpr)
+    results_auc['tpr'][i][0] = 0.0
+    results_auc['fpr'][i] = fpr_temp
+    results_auc['auc'][i] = auc
     randomState += 10
 
-# Confidence Interval For For one fold
+tpr_mean5 = [(a+b+c+d+e) / 5 for a, b, c, d, e in zip(list(results_auc['tpr'][0]), list(results_auc['tpr'][1]), list(results_auc['tpr'][2]), list(results_auc['tpr'][3]), list(results_auc['tpr'][4]))]
+fpr_mean5 = [(a+b+c+d+e) / 5 for a, b, c, d, e in zip(list(results_auc['fpr'][0]), list(results_auc['fpr'][1]), list(results_auc['fpr'][2]), list(results_auc['fpr'][3]), list(results_auc['fpr'][4]))]
+auc_mean5 = metrics.auc(fpr_mean5, tpr_mean5)
+
+aucs = np.array(list(results_auc['auc'].values()))
+aucs.sort()
+confidence_lower_mean = aucs[int(0.025 * len(aucs))]
+confidence_upper_mean = aucs[int(0.975 * len(aucs))]
+
+# Single Fold
 random_state = 40    
 classifier = LogisticRegression()
 X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = randomState)
 classifier.fit(X_train, y_train)
-y_pred_proba = classifier.predict_proba(X_test)[::,1]
-fpr_single, tpr_single, _ = metrics.roc_curve(y_test,  y_pred_proba)
-auc_single = metrics.roc_auc_score(y_test, y_pred_proba)
-
+y_pred = classifier.predict_proba(X_test)[::,1]
+fpr_single, tpr_single, _ = metrics.roc_curve(y_test,  y_pred)
+auc_single = metrics.roc_auc_score(y_test, y_pred)
 auc_CI = []
 nsamples = 1000
 for b in range(nsamples):
@@ -330,67 +212,34 @@ for b in range(nsamples):
     
 auc_CI = np.array(auc_CI)
 auc_CI.sort()
-
 confidence_lower_single = auc_CI[int(0.025 * len(auc_CI))]
 confidence_upper_single = auc_CI[int(0.975 * len(auc_CI))]
-
-#viz = plot_roc_curve(classifier, X_test, y_test, name='ROC fold {}'.format(i),alpha=0.3, lw=1, ax=ax)
-
-aucs_temp = np.array(list(results['auc'].values()))
-aucs_temp.sort()
-confidence_lower_mean = aucs_temp[int(0.025 * len(aucs_temp))]
-confidence_upper_mean = aucs_temp[int(0.975 * len(aucs_temp))]
-
-fig, ax = plt.subplots()   
+#Plot
+fig, ax = plt.subplots(figsize=(10, 10))   
 ax.plot([0, 1], [0, 1], linestyle='--', lw=2, color='k', alpha=.8)
-
-mean_tpr = [(a+ b+ c+ d+ e) / 5 for a, b, c, d, e in zip(list(results['tpr'][0]), list(results['tpr'][1]), list(results['tpr'][2]), list(results['tpr'][3]),
-                                                         list(results['tpr'][4]))]
-mean_fpr = [(a+ b+ c+ d+ e) / 5 for a, b, c, d, e in zip(list(results['fpr'][0]), list(results['fpr'][1]), list(results['fpr'][2]), list(results['fpr'][3]), 
-                                                         list(results['fpr'][4]))]
-
-mean_auc = metrics.auc(mean_fpr, mean_tpr)
-ax.plot(fpr_single, tpr_single, color = 'b', label = r'AUC = ' + str(round(auc_single,2)) + '(' + str(round(confidence_lower_single, 2)) + ' - ' + str(round(confidence_upper_single, 2)) + ')',
-        lw = 2, alpha = .8)
-ax.plot(mean_fpr, mean_tpr, color = 'r', label = 'Mean AUC = ' + str(round(mean_auc,2)) + '(' + str(round(confidence_lower_mean, 2)) + ' - ' + str(round(confidence_upper_mean, 2)) + ')',
-        lw =4, alpha = .8)
+ax.plot(fpr_single, tpr_single, color = 'b', label = r'AUC = ' + str(round(auc_single,2)) + '(' + str(round(confidence_lower_single, 2)) + ' - ' + str(round(confidence_upper_single, 2)) + ')', lw = 2, alpha = .8)
+ax.plot(fpr_mean5, tpr_mean5, color = 'r', label = 'Mean AUC = ' + str(round(auc_mean5,2)) + '(' + str(round(confidence_lower_mean, 2)) + ' - ' + str(round(confidence_upper_mean, 2)) + ')', lw =4, alpha = .8)
 
 ax.set(xlim=[-0.05, 1.05], ylim=[-0.05, 1.05])
 ax.legend(loc="lower right", fontsize='large')
 ax.set_xlabel('1 - Specificity', fontsize='large', fontweight='bold')
 ax.set_ylabel('Sensitivity', fontsize='large', fontweight='bold')
 ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+plt.savefig(os.path.join(output_path, f'AUCs.svg'), format='svg')
 plt.show()
 
 # %%
-
-fig, ax = plt.subplots()
-X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = 73)
-classifier = LogisticRegression()
-classifier.fit(X_train, y_train)
-
-viz = plot_roc_curve(classifier, X_test, y_test, name='ROC', lw=1, ax=ax)
-ax.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r',label='Chance', alpha=.8)
-plt.title('Receiver Operating Characteristic')
-plt.legend(loc = 'lower right')
-plt.xlim([0, 1])
-plt.ylim([0, 1])
-plt.ylabel('True Positive Rate')
-plt.xlabel('False Positive Rate')
-plt.show()
-
-
-disp = plot_confusion_matrix(classifier, X_test, y_test,
-                             display_labels = ['Healthy', 'Infected'],
-                             cmap = plt.cm.Blues,
-                             normalize = None)
-
-###########################################################################
-
-
-
-
-
-
-
-    
+#fig, ax = plt.subplots()
+#X_train, X_test, y_train, y_test = train_test_split(x, y, test_size = 0.2,  random_state = 73)
+#classifier = LogisticRegression()
+#classifier.fit(X_train, y_train)
+#viz = plot_roc_curve(classifier, X_test, y_test, name='ROC', lw=1, ax=ax)
+#ax.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r',label='Chance', alpha=.8)
+#plt.title('Receiver Operating Characteristic')
+#plt.legend(loc = 'lower right')#
+#plt.xlim([0, 1])
+#plt.ylim([0, 1])
+#plt.ylabel('True Positive Rate')
+#plt.xlabel('False Positive Rate')
+#plt.show()
+#disp = plot_confusion_matrix(classifier, X_test, y_test,display_labels = ['Healthy', 'Infected'],cmap = plt.cm.Blues,normalize = None)
