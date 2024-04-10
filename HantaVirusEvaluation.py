@@ -20,14 +20,17 @@ from sklearn import metrics
 import os
 
 #%%
-input_path = '/Users/narmin/Documents/Hanta_Virus_Data/Narmin_DATA_UPLOADFILE_200224_JB_GB2.xlsx'
-output_path = '/Users/narmin/Documents/Hanta_Virus_Data/Results_08042024/Hanta vs. All Controls'
-sheet_name = 'Hanta vs. All Controls 2'
+input_path = '###.xlsx'
+output_path = '###'
+sheet_name = '###'
+
 data = pd.read_excel(open(input_path, 'rb'), sheet_name = sheet_name) 
-x_labels = ['Fever (yes/no)', 'Headache (yes/no)', 'LDH >300 U/dL (yes/no)', 'AKI as Crea >=0,3 mg/dL ULN on DOA (yes/no)']
+
+x_labels = ['Fever (yes/no)', 'Headache (yes/no)', 'LDH >300 U/dL (yes/no)', 'AKI as Crea >=0,3 mg/dL ULN on DOA (yes/no)', 'Platelets <150/nL on DOA (yes/no)']
 y_label = ['Hanta-positive (yes/no)']
+
 filtered_data = data[x_labels] 
-     
+
 imp = SimpleImputer(strategy="most_frequent")
 x = np.array(imp.fit_transform(filtered_data))
 
@@ -39,22 +42,24 @@ classifier = LogisticRegression()
 classifier.fit(x, y)
 print(classifier.coef_)
 
-points = np.abs(np.round(classifier.coef_))
-points = points[0]
+points = []
+for item in classifier.coef_[0]:
+    if item>0:
+        item = np.floor(item) 
+    else:
+        item = np.ceil(item) 
+    points.append(abs(item))
 print(points)
+
 #%%
 scoreList = []
 
+# Assuming data is a pandas DataFrame, x_labels is a list of column names, and points is a list of corresponding scores
 for i in range(len(data)):
     score = 0
-    if data.iloc[i][x_labels[0]] == 1:
-        score += points[0]
-    if data.iloc[i][x_labels[1]] == 1:
-        score += points[1]
-    if data.iloc[i][x_labels[2]] == 1:
-        score += points[2]
-    if data.iloc[i][x_labels[3]] == 1:
-        score += points[3]
+    for j, label in enumerate(x_labels):
+        if data.iloc[i][label] == 1:
+            score += points[j]
     scoreList.append(score)
 
 data['scores'] = scoreList
